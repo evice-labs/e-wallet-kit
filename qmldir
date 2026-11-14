@@ -1,0 +1,6 @@
+module WallezKit
+Provider 1.0 Provider.qml
+ConnectButton 1.0 ConnectButton.qml
+ConnectModal 1.0 ConnectModal.qml
+Theme 1.0 Theme.qml
+

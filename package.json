@@ -1,0 +1,18 @@
+{
+  "name": "@evice/wallez-kit",
+  "version": "1.0.0",
+  "description": "Standard Wallet Connector & Provider for Basecamp dApps",
+  "main": "qmldir",
+  "author": "Evice Labs",
+  "license": "MIT OR Apache-2.0",
+  "keywords": [
+    "wallez",
+    "wallet",
+    "evice",
+    "lez",
+    "qml",
+    "basecamp",
+    "web3"
+  ]
+}
+
