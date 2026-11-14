@@ -7,6 +7,22 @@
 - **Real-Time Reactive State**: Instant, automatic bindings for `isConnected`, `activeAddress`, `voterCommitment`, and `balance`.
 - **Built-in ZK Identity Accountability**: Support for the [Evice Identity Stack](https://github.com/evice-labs/e-identity-stack) (deterministic scoped nullifiers & BIP-340 Schnorr signatures).
 
+## Installation
+
+Add WallezKit as a Git submodule inside your Basecamp dApp's `qml/` directory:
+
+```bash
+cd my-basecamp-dapp
+git submodule add https://github.com/evice-labs/wallez-kit.git qml/WallezKit
+```
+
+> **Cloning an existing dApp?** Clone with submodules so WallezKit is initialized automatically:
+> ```bash
+> git clone --recursive <dapp-repo-url>
+> # or if already cloned:
+> git submodule update --init --recursive
+> ```
+
 ## Quick Start for dApp Developers
 
 ### 1. Import the Module
@@ -14,7 +30,7 @@ Add the `WallezKit` module import to your dApp's QML files:
 ```qml
 import QtQuick
 import QtQuick.Layouts
-import WallezKit 1.0
+import "WallezKit"
 ```
 
 ### 2. Mount the `Provider`
