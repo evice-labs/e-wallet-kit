@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: QML Format, Lint, and Module Integrity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify Module Manifest and Licenses
+        run: |
+          test -f qmldir || { echo "qmldir missing"; exit 1; }
+          grep -q '^module WallezKit$' qmldir || { echo "Invalid module declaration in qmldir"; exit 1; }
+          while read -r symbol version file; do
+            if [ -z "$symbol" ] || [ "$symbol" = "module" ]; then
+              continue
+            fi
+            test -f "$file" || { echo "Missing file referenced by qmldir: $file"; exit 1; }
+          done < qmldir
+          test -f Client.js || { echo "Client.js missing"; exit 1; }
+          test -f LICENSE-APACHE || { echo "LICENSE-APACHE missing"; exit 1; }
+          test -f LICENSE-MIT || { echo "LICENSE-MIT missing"; exit 1; }
+          echo "Module manifest and license files verified."
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v16
+
+      - name: Setup Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v9
+
+      - name: Verify QML Formatting and Linting
+        run: |
+          nix shell nixpkgs#qt6.qtdeclarative nixpkgs#diffutils --command bash -euo pipefail -c '
+            QML_IMPORT_DIR="$(dirname "$(command -v qmllint)")/../lib/qt-6/qml"
+            for file in *.qml; do
+              echo "Checking format: $file"
+              qmlformat "$file" > "/tmp/${file}.fmt"
+              diff -u "$file" "/tmp/${file}.fmt" || {
+                echo "Error: $file is not formatted according to qmlformat."
+                exit 1
+              }
+              echo "Linting: $file"
+              qmllint -I "$QML_IMPORT_DIR" "$file"
+            done
+          '
+

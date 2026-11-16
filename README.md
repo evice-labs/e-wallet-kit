@@ -3,9 +3,10 @@
 > **The standard Wallet Connector & Provider for Basecamp dApps.**  
 
 ## Features
-- **Official Drop-in UI**: Production-ready `<ConnectButton />` and `<ConnectModal />` components out of the box.
-- **Real-Time Reactive State**: Instant, automatic bindings for `isConnected`, `activeAddress`, `voterCommitment`, and `balance`.
-- **Built-in ZK Identity Accountability**: Support for the [Evice Identity Stack](https://github.com/evice-labs/e-identity-stack) (deterministic scoped nullifiers & BIP-340 Schnorr signatures).
+- **Official Drop-in UI**: Production-ready `<ConnectButton />` and `<ConnectModal />` components out of the box, with inline error feedback when the host wallet is locked or uninitialized.
+- **Real-Time Reactive State & Lifecycle Management**: Instant bindings for `isConnected`, `activeAddress`, `voterCommitment`, and `accounts`, with automatic IPC replica warm-up on mount, automatic session revocation on component destruction, and reactive session invalidation detection when the wallet locks or revokes access.
+- **Built-in ZK Identity Accountability**: Support for the [Evice Identity Stack](https://github.com/evice-labs/e-identity-stack) (deterministic scoped nullifiers & raw hex-encoded BIP-340 Schnorr signatures).
+- **Interactive Approval Synchronization**: Automatic cross-module approval envelope registration and cleanup (`proposeContractCall`, `proposeTransfer`, `cancelRequest`) for seamless `ApprovalModal` handshakes in Wallez.
 
 ## Installation
 
@@ -41,7 +42,7 @@ Item {
 
     Provider {
         id: wallet
-        dappName: "My Evice dApp"
+        dappName: "My dApp"
         requestedGrants: ["IdentityRead", "IdentityPropose"]
         onConnected: (account) => console.log("Connected account:", account.canonical_address)
     }
@@ -80,7 +81,9 @@ RowLayout {
 #### Properties
 | Property | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `dappName` | `string` | `"Evice dApp"` | The public name of your application shown in permission prompts. |
+| `dappName` | `string` | `"Logos dApp"` | The public name of your application shown in permission prompts and Wallez Activity Feed. |
+| `dappIcon` | `string` | `""` | Optional icon URL/path displayed in `ConnectModal` when valid. |
+| `apiVersion` | `int` | `1` | Capability negotiation protocol version passed to `connectDApp`. |
 | `requestedGrants` | `var` | `["IdentityRead", "IdentityPropose"]` | Array of requested permission grants from the Evice Identity Stack. |
 | `isConnected` | `bool` | `false` | Read-only reactive flag indicating if an active session is established. |
 | `isConnecting` | `bool` | `false` | Read-only flag set to `true` while handshake or grant requests are pending. |
@@ -90,17 +93,20 @@ RowLayout {
 | `voterCommitment` | `string` | `""` | 32-byte hex public ZK Master Commitment for privacy-preserving citizen verification. |
 | `accounts` | `var` | `[]` | Array of all accounts accessible to this dApp session. |
 | `statusMessage` | `string` | `"Disconnected"` | Real-time human-readable status description. |
-| `lastError` | `string` | `""` | Descriptive error message from the most recent failed operation. |
+| `lastError` | `string` | `""` | Descriptive error message from the most recent failed operation (e.g. when Wallez is locked or not initialized). |
 
 #### Methods
 | Method | Parameters | Return / Callback | Description |
 | :--- | :--- | :--- | :--- |
-| `connect(callback)` | `callback: function(res)` | `{ ok: bool, session_id: string }` | Initiates the dApp connection handshake, requests accounts, and acquires configured identity grants. |
-| `disconnect(callback)` | `callback: function(res)` | `{ ok: bool }` | Terminates and revokes the active session, resetting local reactive state. |
+| `warmup()` | *(none)* | `void` | Pre-warms the `QRemoteObjectReplica` IPC connection to `e_wallet_core`. Called automatically on `Component.onCompleted` and `ConnectModal.open()`. |
+| `connect(callback)` | `callback: function(res)` | `{ ok: bool, session_id: string, error?: string }` | Initiates the dApp connection handshake (with automatic cold-start replica retry), grants account access, and acquires configured identity grants. |
+| `disconnect(callback)` | `callback: function(res)` | `{ ok: bool }` | Cleans up pending approval envelopes, revokes the active session on `e_wallet_core`, and resets local reactive state. Called automatically on `Component.onDestruction`. |
 | `deriveNullifier(scopeId, callback)` | `scopeId: string, callback: function(res)` | `{ ok: bool, nullifier: string }` | Computes a deterministic, unlinkable scoped nullifier for a specific domain (e.g. proposal ID). |
-| `signAttestation(scopeId, payload, callback)` | `scopeId: string, payload: any, callback: function(res)` | `{ ok: bool, signature: string }` | Produces a 64-byte BIP-340 Schnorr signature using the scoped citizen credential. |
-| `proposeContractCall(programId, payerId, mentions, calldataHex, description, callback)` | `programId, payerId, mentions, calldataHex, description, callback` | `{ ok: bool, request_id: string }` | Proposes a smart contract call to the LEZ Sequencer, triggering Wallez's interactive `ApprovalModal`. |
-| `proposeTransfer(toAddressOrName, amountUnits, callback)` | `toAddressOrName, amountUnits, callback` | `{ ok: bool, request_id: string }` | Proposes a native token transfer, triggering Wallez's interactive `ApprovalModal`. |
+| `signAttestation(scopeId, payload, callback)` | `scopeId: string, payload: any, callback: function(res)` | `{ ok: bool, signature: string }` | Encodes `payload` as raw lowercase hex (`Client.toHex`) and produces a 64-byte BIP-340 Schnorr signature using the scoped citizen credential. |
+| `proposeContractCall(programId, payerId, mentions, calldataHex, description, callback)` | `programId, payerId, mentions, calldataHex, description, callback` | `{ ok: bool, request_id: string, status: string }` | Normalizes account prefixes (`Public/` / `Private/`) and calldata hex, proposes a smart contract call, and registers a cross-module approval envelope for Wallez's `ApprovalModal`. |
+| `proposeTransfer(toAddressOrName, amountUnits, callback)` | `toAddressOrName, amountUnits, callback` | `{ ok: bool, request_id: string, status: string }` | Proposes a native token transfer and registers an approval envelope with transfer metadata (`amount`, `payer_id`, `to`) for Wallez's `ApprovalModal`. |
+| `cancelRequest(requestId, callback)` | `requestId: string, callback: function(res)` | `{ ok: bool }` | Cleans up the approval envelope and cancels a `pending_approval` request in Wallez Core. |
+| `cleanupApprovalEnvelope(requestId)` | `requestId: string` | `void` | Removes the temporary approval notification envelope once a request has been resolved. |
 
 ### `ConnectButton`
 
@@ -127,4 +133,9 @@ RowLayout {
 - **Interactive Mutational Approvals**: Read operations and deterministic nullifier derivation are handled seamlessly through granted session permissions, while financial transfers and on-chain contract executions always trigger Wallez's explicit `ApprovalModal` dialog.
 
 ## License
-MIT OR Apache-2.0. Copyright (c) 2026 Evice Labs.
+
+Dual-licensed under either:
+- **Apache License, Version 2.0** ([LICENSE-APACHE](LICENSE-APACHE))
+- **MIT License** ([LICENSE-MIT](LICENSE-MIT))
+
+at your option.

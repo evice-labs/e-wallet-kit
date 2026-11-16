@@ -44,8 +44,16 @@ Item {
                     SequentialAnimation on opacity {
                         running: control.provider.isConnecting
                         loops: Animation.Infinite
-                        NumberAnimation { from: 0.3; to: 1.0; duration: 400 }
-                        NumberAnimation { from: 1.0; to: 0.3; duration: 400 }
+                        NumberAnimation {
+                            from: 0.3
+                            to: 1.0
+                            duration: 400
+                        }
+                        NumberAnimation {
+                            from: 1.0
+                            to: 0.3
+                            duration: 400
+                        }
                     }
                 }
 
@@ -91,29 +99,6 @@ Item {
                 RowLayout {
                     id: accountRow
                     anchors.centerIn: parent
-                    spacing: 8
-
-                    // Mini Avatar Circle
-                    Rectangle {
-                        width: 20
-                        height: 20
-                        radius: 10
-                        color: theme.statusPublic
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: {
-                                var addr = control.provider.activeAddress || "";
-                                if (addr.startsWith("Public/")) return addr.substring(7, 8).toUpperCase();
-                                if (addr.startsWith("Private/")) return addr.substring(8, 9).toUpperCase();
-                                return addr.length > 0 ? addr.substring(0, 1).toUpperCase() : "W";
-                            }
-                            color: "#FFFFFF"
-                            font.family: theme.fontFamily
-                            font.pixelSize: theme.badgeText
-                            font.bold: true
-                        }
-                    }
 
                     // Truncated Address Text
                     Text {
@@ -123,23 +108,15 @@ Item {
                         font.pixelSize: theme.secondaryText
                         font.weight: Font.Medium
                     }
-
-                    // Green Active Indicator Dot
-                    Rectangle {
-                        width: 6
-                        height: 6
-                        radius: 3
-                        color: theme.statusSuccess
-                    }
                 }
 
                 MouseArea {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        // Toggle info / copy address if needed
-                    }
+                    onClicked:
+                    // Toggle info / copy address if needed
+                    {}
                 }
             }
 
