@@ -21,9 +21,9 @@ jobs:
           test -f qmldir || { echo "qmldir missing"; exit 1; }
           grep -q '^module WallezKit$' qmldir || { echo "Invalid module declaration in qmldir"; exit 1; }
           while read -r symbol version file; do
-            case "$symbol" in
-              ""|"module"|#*) continue ;;
-            esac
+            if [ -z "$symbol" ] || [ "$symbol" = "module" ]; then
+              continue
+            fi
             test -f "$file" || { echo "Missing file referenced by qmldir: $file"; exit 1; }
           done < qmldir
           test -f Client.js || { echo "Client.js missing"; exit 1; }
@@ -52,3 +52,4 @@ jobs:
               qmllint -I "$QML_IMPORT_DIR" "$file"
             done
           '
+
