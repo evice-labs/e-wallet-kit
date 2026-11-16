@@ -23,6 +23,12 @@ Item {
     }
 
     function open() {
+        if (modal.provider) {
+            modal.provider.lastError = "";
+            if (typeof modal.provider.warmup === "function") {
+                modal.provider.warmup();
+            }
+        }
         modal.opacity = 1.0;
     }
 
@@ -72,11 +78,13 @@ Item {
                     id: dappIconContainer
                     readonly property string iconSrc: modal.provider && modal.provider.dappIcon ? modal.provider.dappIcon.trim() : ""
                     readonly property bool hasIcon: iconSrc.length > 0
+                    readonly property real iconSize: visible ? headerTextCol.implicitHeight : 0
                     visible: hasIcon && (dappImg.status === Image.Ready || dappImg.status === Image.Loading) && dappImg.status !== Image.Error
-                    Layout.preferredWidth: visible ? 38 : 0
-                    Layout.preferredHeight: visible ? 38 : 0
-                    implicitWidth: visible ? 38 : 0
-                    implicitHeight: visible ? 38 : 0
+                    Layout.preferredWidth: iconSize
+                    Layout.preferredHeight: iconSize
+                    Layout.alignment: Qt.AlignVCenter
+                    implicitWidth: iconSize
+                    implicitHeight: iconSize
                     radius: theme.radiusLarge
                     color: "transparent"
                     clip: true
@@ -87,12 +95,13 @@ Item {
                         source: dappIconContainer.hasIcon ? dappIconContainer.iconSrc : ""
                         fillMode: Image.PreserveAspectFit
                         mipmap: true
-                        asynchronous: true
+                        asynchronous: false
                         smooth: true
                     }
                 }
 
                 ColumnLayout {
+                    id: headerTextCol
                     Layout.fillWidth: true
                     spacing: 2
 
@@ -168,6 +177,28 @@ Item {
                 }
             }
 
+            // Error / Status Banner (shown when Wallez is locked or uninitialized)
+            Rectangle {
+                Layout.fillWidth: true
+                visible: modal.provider && modal.provider.lastError && modal.provider.lastError.length > 0
+                implicitHeight: errorText.implicitHeight + 16
+                radius: theme.radiusButton
+                color: Qt.rgba(0.94, 0.27, 0.27, 0.12)
+                border.color: theme.statusError
+                border.width: 1
+
+                Text {
+                    id: errorText
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    text: modal.provider ? modal.provider.lastError : ""
+                    color: theme.statusError
+                    font.family: theme.fontFamily
+                    font.pixelSize: theme.secondaryText
+                    wrapMode: Text.WordWrap
+                }
+            }
+
             // Divider Line before Footer
             Rectangle {
                 Layout.fillWidth: true
@@ -232,7 +263,7 @@ Item {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             if (modal.provider) {
-                                modal.provider.connect(function(res) {
+                                modal.provider.connect(function (res) {
                                     if (res && res.ok) {
                                         modal.close();
                                     }

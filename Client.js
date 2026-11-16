@@ -26,11 +26,11 @@ function parseJson(raw) {
 }
 
 /**
- * Convert string or object to 0x-prefixed hex string.
+ * Convert string or object to raw lowercase hex string (without 0x prefix for Rust hex::decode compatibility).
  */
 function toHex(input) {
     var str = typeof input === "string" ? input : JSON.stringify(input);
-    var hex = "0x";
+    var hex = "";
     for (var i = 0; i < str.length; i++) {
         var code = str.charCodeAt(i).toString(16);
         if (code.length === 1) code = "0" + code;

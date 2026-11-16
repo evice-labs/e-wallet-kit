@@ -41,6 +41,7 @@ QtObject {
     readonly property color statusSuccess: "#00E575"
     readonly property color statusWarning: "#EAB308"
     readonly property color statusDanger: "#EF4444"
+    readonly property color statusError: "#EF4444"
     readonly property color statusShielded: "#A855F7"
     readonly property color statusPublic: "#0A70F5"
 
@@ -56,20 +57,20 @@ QtObject {
 
     // ── Typography Scale ──────────────────────────────────────
     readonly property int titleText: 30        // Theme.typography.titleText
-    readonly property int panelTitleText: 24   // Theme.typography.panelTitleText (Judul Panel / Card / Modal)
+    readonly property int panelTitleText: 24   // Theme.typography.panelTitleText
     readonly property int subtitleText: 16     // Theme.typography.subtitleText
     readonly property int primaryText: 14      // Theme.typography.primaryText (Body Text)
     readonly property int secondaryText: 12    // Theme.typography.secondaryText (Description / Small Text)
     readonly property int badgeText: 10        // Theme.typography.badgeText (Tiny)
 
-    // Font size 
+    // Font size
     readonly property int fontSizeDisplay: 42
     readonly property int fontSizeHero: 32
-    readonly property int fontSizeTitle: panelTitleText    // 24 -> matches logos-storage-ui panelTitleText
-    readonly property int fontSizeSubtitle: subtitleText   // 16
-    readonly property int fontSizeBody: primaryText        // 14 -> matches logos-storage-ui primaryText
-    readonly property int fontSizeSmall: secondaryText     // 12 -> matches logos-storage-ui secondaryText
-    readonly property int fontSizeTiny: badgeText          // 10 -> matches logos-storage-ui badgeText
+    readonly property int fontSizeTitle: panelTitleText
+    readonly property int fontSizeSubtitle: subtitleText
+    readonly property int fontSizeBody: primaryText
+    readonly property int fontSizeSmall: secondaryText
+    readonly property int fontSizeTiny: badgeText
 
     // Font weights
     readonly property int weightRegular: 400
@@ -94,4 +95,3 @@ QtObject {
     readonly property int radiusCard: 8
     readonly property int radiusInset: 6
 }
-
