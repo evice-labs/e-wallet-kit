@@ -17,8 +17,10 @@ Item {
     property string sessionId: ""
     property var activeAccount: null
     property string activeAddress: ""
+    property string selectedAccountId: ""
     property string voterCommitment: ""
     property var accounts: []
+    property var availableAccounts: []
     property string statusMessage: "Disconnected"
     property string lastError: ""
 
@@ -115,10 +117,14 @@ Item {
     }
 
     // Connect Handshake
-    function connect(callback) {
+    function connect(selectedIdOrCallback, maybeCallback) {
+        var cb = (typeof selectedIdOrCallback === "function") ? selectedIdOrCallback : maybeCallback;
+        if (typeof selectedIdOrCallback === "string" && selectedIdOrCallback.length > 0) {
+            provider.selectedAccountId = selectedIdOrCallback;
+        }
         if (provider.isConnected && provider.sessionId) {
-            if (callback)
-                callback({
+            if (cb)
+                cb({
                     ok: true,
                     session_id: provider.sessionId
                 });
@@ -129,9 +135,9 @@ Item {
         provider.isConnecting = true;
         provider.statusMessage = "Connecting to Wallez Core...";
         provider._connectRetryCount = 0;
-        provider._pendingConnectCallback = callback || null;
+        provider._pendingConnectCallback = cb || null;
 
-        _attemptConnect(callback);
+        _attemptConnect(cb);
     }
 
     function _attemptConnect(callback) {
@@ -251,6 +257,61 @@ Item {
         provider.disconnected();
     }
 
+    function loadAvailableAccounts(callback) {
+        if (!provider.isHostAvailable) {
+            provider.availableAccounts = [];
+            if (callback)
+                callback({
+                    ok: false,
+                    accounts: []
+                });
+            return;
+        }
+        invoke("isInitialized", [], function (initRes) {
+            var isInit = !!(initRes && (initRes.initialized === true || initRes.value === true || (initRes.ok === true && initRes.locked !== true && initRes.initialized !== false)));
+            invoke("listAllAccounts", [], function (allRes) {
+                if (allRes && allRes.ok && Array.isArray(allRes.accounts) && allRes.accounts.length > 0) {
+                    provider.availableAccounts = allRes.accounts;
+                    var hasCurrent = false;
+                    for (var i = 0; i < allRes.accounts.length; i++) {
+                        if (allRes.accounts[i].account_id === provider.selectedAccountId) {
+                            hasCurrent = true;
+                            break;
+                        }
+                    }
+                    if (!hasCurrent) {
+                        provider.selectedAccountId = allRes.accounts[0].account_id || "";
+                    }
+                } else {
+                    provider.availableAccounts = [];
+                    if (allRes && allRes.error) {
+                        provider.lastError = formatErrorMessage(allRes.error);
+                    }
+                }
+                if (callback)
+                    callback(allRes || {
+                        ok: false,
+                        accounts: []
+                    });
+            });
+        });
+    }
+
+    function selectAccount(accountId) {
+        if (!accountId)
+            return;
+        provider.selectedAccountId = accountId;
+        var list = (provider.accounts && provider.accounts.length > 0) ? provider.accounts : provider.availableAccounts;
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].account_id === accountId) {
+                provider.activeAccount = list[i];
+                provider.activeAddress = list[i].canonical_address || list[i].account_id;
+                provider.accountChanged(provider.activeAccount);
+                break;
+            }
+        }
+    }
+
     // Accounts Loader
     function loadAccounts(callback) {
         if (!provider.sessionId) {
@@ -262,26 +323,53 @@ Item {
         invoke("listSessionAccounts", [provider.sessionId], function (res) {
             if (res && res.ok && res.accounts && res.accounts.length > 0) {
                 provider.accounts = res.accounts;
-                provider.activeAccount = res.accounts[0];
-                provider.activeAddress = res.accounts[0].canonical_address || res.accounts[0].account_id;
+                var chosen = res.accounts[0];
+                if (provider.selectedAccountId) {
+                    for (var i = 0; i < res.accounts.length; i++) {
+                        if (res.accounts[i].account_id === provider.selectedAccountId) {
+                            chosen = res.accounts[i];
+                            break;
+                        }
+                    }
+                }
+                provider.activeAccount = chosen;
+                provider.activeAddress = chosen.canonical_address || chosen.account_id;
+                provider.selectedAccountId = chosen.account_id || "";
                 provider.accountChanged(provider.activeAccount);
                 if (callback)
                     callback();
             } else {
-                // Query all accounts and bind read + propose permissions to this session
+                // Query all accounts and bind read + propose permissions to the selected account (or all if unspecified)
                 invoke("listAllAccounts", [], function (allRes) {
                     if (allRes && allRes.ok && allRes.accounts && allRes.accounts.length > 0) {
                         var accList = allRes.accounts;
-                        for (var i = 0; i < accList.length; i++) {
-                            var accId = accList[i].account_id;
-                            if (accId) {
-                                invoke("grantAccountAccess", [provider.sessionId, accId, "read"]);
-                                invoke("grantAccountAccess", [provider.sessionId, accId, "propose"]);
+                        var chosen = accList[0];
+                        if (provider.selectedAccountId) {
+                            for (var k = 0; k < accList.length; k++) {
+                                if (accList[k].account_id === provider.selectedAccountId) {
+                                    chosen = accList[k];
+                                    break;
+                                }
                             }
                         }
-                        provider.accounts = accList;
-                        provider.activeAccount = accList[0];
-                        provider.activeAddress = accList[0].canonical_address || accList[0].account_id;
+                        var targetAccId = chosen.account_id;
+                        if (provider.selectedAccountId && targetAccId) {
+                            invoke("grantAccountAccess", [provider.sessionId, targetAccId, "read"]);
+                            invoke("grantAccountAccess", [provider.sessionId, targetAccId, "propose"]);
+                            provider.accounts = [chosen];
+                        } else {
+                            for (var j = 0; j < accList.length; j++) {
+                                var accId = accList[j].account_id;
+                                if (accId) {
+                                    invoke("grantAccountAccess", [provider.sessionId, accId, "read"]);
+                                    invoke("grantAccountAccess", [provider.sessionId, accId, "propose"]);
+                                }
+                            }
+                            provider.accounts = accList;
+                        }
+                        provider.activeAccount = chosen;
+                        provider.activeAddress = chosen.canonical_address || chosen.account_id;
+                        provider.selectedAccountId = chosen.account_id || "";
                         provider.accountChanged(provider.activeAccount);
                     }
                     if (callback)

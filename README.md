@@ -90,23 +90,27 @@ RowLayout {
 | `sessionId` | `string` | `""` | The unique session identifier assigned by Wallez Core. |
 | `activeAccount` | `var` | `null` | The active account object containing `account_id`, `canonical_address`, `balance`, etc. |
 | `activeAddress` | `string` | `""` | The canonical address of the currently selected account (`Public/...` or `Private/...`). |
+| `selectedAccountId` | `string` | `""` | Account ID selected by the user in `ConnectModal` (or via `selectAccount()`) for scoped session grants. |
 | `voterCommitment` | `string` | `""` | 32-byte hex public ZK Master Commitment for privacy-preserving citizen verification. |
-| `accounts` | `var` | `[]` | Array of all accounts accessible to this dApp session. |
+| `accounts` | `var` | `[]` | Array of accounts granted to this dApp session. |
+| `availableAccounts` | `var` | `[]` | Array of wallet accounts fetched via `loadAvailableAccounts()` for selection in `ConnectModal`. |
 | `statusMessage` | `string` | `"Disconnected"` | Real-time human-readable status description. |
 | `lastError` | `string` | `""` | Descriptive error message from the most recent failed operation (e.g. when Wallez is locked or not initialized). |
 
 #### Methods
 | Method | Parameters | Return / Callback | Description |
 | :--- | :--- | :--- | :--- |
-| `warmup()` | *(none)* | `void` | Pre-warms the `QRemoteObjectReplica` IPC connection to `e_wallet_core`. Called automatically on `Component.onCompleted` and `ConnectModal.open()`. |
-| `connect(callback)` | `callback: function(res)` | `{ ok: bool, session_id: string, error?: string }` | Initiates the dApp connection handshake (with automatic cold-start replica retry), grants account access, and acquires configured identity grants. |
-| `disconnect(callback)` | `callback: function(res)` | `{ ok: bool }` | Cleans up pending approval envelopes, revokes the active session on `e_wallet_core`, and resets local reactive state. Called automatically on `Component.onDestruction`. |
-| `deriveNullifier(scopeId, callback)` | `scopeId: string, callback: function(res)` | `{ ok: bool, nullifier: string }` | Computes a deterministic, unlinkable scoped nullifier for a specific domain (e.g. proposal ID). |
-| `signAttestation(scopeId, payload, callback)` | `scopeId: string, payload: any, callback: function(res)` | `{ ok: bool, signature: string }` | Encodes `payload` as raw lowercase hex (`Client.toHex`) and produces a 64-byte BIP-340 Schnorr signature using the scoped citizen credential. |
-| `proposeContractCall(programId, payerId, mentions, calldataHex, description, callback)` | `programId, payerId, mentions, calldataHex, description, callback` | `{ ok: bool, request_id: string, status: string }` | Normalizes account prefixes (`Public/` / `Private/`) and calldata hex, proposes a smart contract call, and registers a cross-module approval envelope for Wallez's `ApprovalModal`. |
-| `proposeTransfer(toAddressOrName, amountUnits, callback)` | `toAddressOrName, amountUnits, callback` | `{ ok: bool, request_id: string, status: string }` | Proposes a native token transfer and registers an approval envelope with transfer metadata (`amount`, `payer_id`, `to`) for Wallez's `ApprovalModal`. |
-| `cancelRequest(requestId, callback)` | `requestId: string, callback: function(res)` | `{ ok: bool }` | Cleans up the approval envelope and cancels a `pending_approval` request in Wallez Core. |
-| `cleanupApprovalEnvelope(requestId)` | `requestId: string` | `void` | Removes the temporary approval notification envelope once a request has been resolved. |
+| `warmup` | *(none)* | `void` | Pre-warms the `QRemoteObjectReplica` IPC connection to `e_wallet_core`. Called automatically on `Component.onCompleted` and `ConnectModal.open()`. |
+| `loadAvailableAccounts` | `callback` | `{ ok, accounts }` | Fetches available wallet accounts before handshake so the user can choose which account to connect in `ConnectModal`. |
+| `selectAccount` | `accountId` | `void` | Switches the active account for the current dApp session and emits `accountChanged`. |
+| `connect` | `selectedIdOrCallback, callback` | `{ ok, session_id, error? }` | Initiates the dApp connection handshake (with automatic cold-start replica retry), grants `read`/`propose` access to the selected account, and acquires configured identity grants. |
+| `disconnect` | `callback` | `{ ok }` | Cleans up pending approval envelopes, revokes the active session on `e_wallet_core`, and resets local reactive state. Called automatically on `Component.onDestruction`. |
+| `deriveNullifier` | `scopeId, callback` | `{ ok, nullifier }` | Computes a deterministic, unlinkable scoped nullifier for a specific domain (e.g. proposal ID). |
+| `signAttestation` | `scopeId, payload, callback` | `{ ok, signature }` | Encodes `payload` as raw lowercase hex (`Client.toHex`) and produces a 64-byte BIP-340 Schnorr signature using the scoped citizen credential. |
+| `proposeContractCall` | `programId, payerId, mentions, calldataHex, description, callback` | `{ ok, request_id, status }` | Normalizes account prefixes (`Public/` / `Private/`) and calldata hex, proposes a smart contract call, and registers a cross-module approval envelope for Wallez's `ApprovalModal`. |
+| `proposeTransfer` | `toAddressOrName, amountUnits, callback` | `{ ok, request_id, status }` | Proposes a native token transfer and registers an approval envelope with transfer metadata (`amount`, `payer_id`, `to`) for Wallez's `ApprovalModal`. |
+| `cancelRequest` | `requestId, callback` | `{ ok }` | Cleans up the approval envelope and cancels a `pending_approval` request in Wallez Core. |
+| `cleanupApprovalEnvelope` | `requestId` | `void` | Removes the temporary approval notification envelope once a request has been resolved. |
 
 ### `ConnectButton`
 
