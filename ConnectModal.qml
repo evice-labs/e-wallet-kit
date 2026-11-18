@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import "Client.js" as Client
 
 Item {
     id: modal
@@ -10,9 +11,35 @@ Item {
     z: 9999
 
     required property var provider
+    property bool isDropdownOpen: false
 
     Theme {
         id: theme
+    }
+
+    readonly property var selectedAccObj: {
+        if (!modal.provider || !modal.provider.availableAccounts || modal.provider.availableAccounts.length === 0)
+            return null;
+        var list = modal.provider.availableAccounts;
+        var sid = modal.provider.selectedAccountId || "";
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].account_id === sid)
+                return list[i];
+        }
+        return list[0];
+    }
+
+    readonly property var otherAccounts: {
+        if (!modal.provider || !modal.provider.availableAccounts)
+            return [];
+        var list = modal.provider.availableAccounts;
+        var selId = modal.selectedAccObj ? modal.selectedAccObj.account_id : "";
+        var out = [];
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].account_id !== selId)
+                out.push(list[i]);
+        }
+        return out;
     }
 
     Behavior on opacity {
@@ -23,16 +50,21 @@ Item {
     }
 
     function open() {
+        modal.isDropdownOpen = false;
         if (modal.provider) {
             modal.provider.lastError = "";
             if (typeof modal.provider.warmup === "function") {
                 modal.provider.warmup();
+            }
+            if (typeof modal.provider.loadAvailableAccounts === "function") {
+                modal.provider.loadAvailableAccounts();
             }
         }
         modal.opacity = 1.0;
     }
 
     function close() {
+        modal.isDropdownOpen = false;
         modal.opacity = 0.0;
     }
 
@@ -177,6 +209,210 @@ Item {
                 }
             }
 
+            // Divider Line between Permissions and Select Account
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: 1
+                color: theme.borderSubtle
+                visible: modal.provider && modal.provider.availableAccounts && modal.provider.availableAccounts.length > 0
+            }
+
+            // Account Selection Dropdown
+            ColumnLayout {
+                id: accountSelectorLayout
+                Layout.fillWidth: true
+                spacing: 8
+                visible: modal.provider && modal.provider.availableAccounts && modal.provider.availableAccounts.length > 0
+
+                Text {
+                    text: "Select Account"
+                    color: theme.textPrimary
+                    font.family: theme.fontFamily
+                    font.pixelSize: theme.primaryText
+                    font.weight: Font.DemiBold
+                }
+
+                // First / Active Selected Account Card
+                Rectangle {
+                    id: selectedAccountCard
+                    readonly property bool isPriv: !!(modal.selectedAccObj && modal.selectedAccObj.is_private)
+                    Layout.fillWidth: true
+                    implicitHeight: 48
+                    radius: theme.radiusButton
+                    color: (modal.isDropdownOpen || triggerMouse.containsMouse) ? theme.bgSurfaceSubtle : theme.bgSurface
+                    border.color: "transparent"
+                    border.width: 0
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 12
+                        spacing: 10
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 1
+
+                            RowLayout {
+                                spacing: 6
+                                Text {
+                                    text: (modal.selectedAccObj && modal.selectedAccObj.label) ? modal.selectedAccObj.label : (selectedAccountCard.isPriv ? "Private Account" : "Public Account")
+                                    color: theme.textPrimary
+                                    font.family: theme.fontFamily
+                                    font.pixelSize: theme.secondaryText
+                                    font.weight: Font.DemiBold
+                                }
+                                Text {
+                                    text: selectedAccountCard.isPriv ? "SHIELDED" : "PUBLIC"
+                                    color: selectedAccountCard.isPriv ? theme.statusShielded : theme.btnPrimaryTop
+                                    font.family: theme.fontFamily
+                                    font.pixelSize: theme.badgeText
+                                    font.weight: Font.Bold
+                                }
+                            }
+
+                            Text {
+                                text: modal.selectedAccObj ? Client.truncateAddress(modal.selectedAccObj.canonical_address || modal.selectedAccObj.account_id, 14, 6) : ""
+                                color: theme.textMuted
+                                font.family: theme.fontMono
+                                font.pixelSize: theme.secondaryText
+                            }
+                        }
+
+                        Text {
+                            text: (modal.selectedAccObj && modal.selectedAccObj.formatted_balance ? modal.selectedAccObj.formatted_balance : "0") + " " + (modal.selectedAccObj && modal.selectedAccObj.unit ? modal.selectedAccObj.unit : "LGO")
+                            color: theme.textSecondary
+                            font.family: theme.fontMono
+                            font.pixelSize: theme.secondaryText
+                            font.weight: Font.Medium
+                        }
+
+                        Text {
+                            visible: modal.otherAccounts.length > 0
+                            text: modal.isDropdownOpen ? "∧" : "∨"
+                            color: theme.textSecondary
+                            font.pixelSize: theme.secondaryText
+                        }
+                    }
+
+                    MouseArea {
+                        id: triggerMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: modal.otherAccounts.length > 0 ? Qt.PointingHandCursor : Qt.ArrowCursor
+                        onClicked: {
+                            if (modal.otherAccounts.length > 0) {
+                                modal.isDropdownOpen = !modal.isDropdownOpen;
+                            }
+                        }
+                    }
+                }
+
+                // Dropdown Options
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: dropdownCol.implicitHeight
+                    radius: theme.radiusButton
+                    color: theme.bgSurface
+                    border.color: "transparent"
+                    border.width: 0
+                    clip: true
+                    visible: modal.isDropdownOpen && modal.otherAccounts.length > 0
+
+                    ColumnLayout {
+                        id: dropdownCol
+                        anchors.fill: parent
+                        spacing: 0
+
+                        Repeater {
+                            model: modal.otherAccounts
+                            delegate: ColumnLayout {
+                                id: otherAccDelegate
+                                required property var modelData
+                                required property int index
+                                readonly property bool isPriv: !!(modelData && modelData.is_private)
+                                Layout.fillWidth: true
+                                spacing: 0
+
+                                Rectangle {
+                                    visible: otherAccDelegate.index > 0
+                                    Layout.fillWidth: true
+                                    implicitHeight: 1
+                                    color: theme.borderSubtle
+                                }
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    height: 44
+                                    radius: 0
+                                    border.color: "transparent"
+                                    border.width: 0
+                                    color: otherAccMouse.containsMouse ? theme.bgSurfaceSubtle : theme.bgSurface
+
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 8
+                                        anchors.rightMargin: 8
+                                        spacing: 10
+
+                                        ColumnLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 1
+
+                                            RowLayout {
+                                                spacing: 6
+                                                Text {
+                                                    text: otherAccDelegate.modelData.label ? otherAccDelegate.modelData.label : (otherAccDelegate.isPriv ? "Private Account" : "Public Account")
+                                                    color: theme.textPrimary
+                                                    font.family: theme.fontFamily
+                                                    font.pixelSize: theme.secondaryText
+                                                    font.weight: Font.DemiBold
+                                                }
+                                                Text {
+                                                    text: otherAccDelegate.isPriv ? "SHIELDED" : "PUBLIC"
+                                                    color: otherAccDelegate.isPriv ? theme.statusShielded : theme.btnPrimaryTop
+                                                    font.family: theme.fontFamily
+                                                    font.pixelSize: theme.badgeText
+                                                    font.weight: Font.Bold
+                                                }
+                                            }
+
+                                            Text {
+                                                text: Client.truncateAddress(otherAccDelegate.modelData.canonical_address || otherAccDelegate.modelData.account_id, 14, 6)
+                                                color: theme.textMuted
+                                                font.family: theme.fontMono
+                                                font.pixelSize: theme.secondaryText
+                                            }
+                                        }
+
+                                        Text {
+                                            text: (otherAccDelegate.modelData.formatted_balance || "0") + " " + (otherAccDelegate.modelData.unit || "LGO")
+                                            color: theme.textSecondary
+                                            font.family: theme.fontMono
+                                            font.pixelSize: theme.secondaryText
+                                            font.weight: Font.Medium
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        id: otherAccMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            if (modal.provider) {
+                                                modal.provider.selectedAccountId = otherAccDelegate.modelData.account_id || "";
+                                            }
+                                            modal.isDropdownOpen = false;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // Error / Status Banner (shown when Wallez is locked or uninitialized)
             Rectangle {
                 Layout.fillWidth: true
@@ -206,12 +442,12 @@ Item {
                 color: theme.borderSubtle
             }
 
-            // Action Buttons (Flat style)
+            // Action Buttons
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 12
 
-                // Cancel Button (Flat Secondary Charcoal with outline)
+                // Cancel Button
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredWidth: 1
@@ -239,7 +475,7 @@ Item {
                     }
                 }
 
-                // Connect Button (Flat Primary Blue, borderless)
+                // Connect Button
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredWidth: 1
@@ -263,7 +499,7 @@ Item {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             if (modal.provider) {
-                                modal.provider.connect(function (res) {
+                                modal.provider.connect(modal.provider.selectedAccountId, function (res) {
                                     if (res && res.ok) {
                                         modal.close();
                                     }
